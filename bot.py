@@ -347,8 +347,8 @@ if __name__ == "__main__":
     keep_alive_thread = threading.Thread(target=keep_alive, daemon=False)
     keep_alive_thread.start()
     
-    # Use either webhook or polling, not both
-    USE_WEBHOOK = True  # Set to False to use polling instead
+    # Use polling instead of webhook for more reliable operation
+    USE_WEBHOOK = False  # Changed to False to use polling
     
     if USE_WEBHOOK:
         # Setup webhook
@@ -366,6 +366,7 @@ if __name__ == "__main__":
             bot.remove_webhook()  # Make sure webhook is removed
             time.sleep(1)
             print("Starting polling...")
-            bot.polling(none_stop=True, interval=0, timeout=20)
+            # Use a more robust polling configuration
+            bot.infinity_polling(timeout=10, long_polling_timeout=30)
         except Exception as e:
             print(f"Polling error: {e}")

@@ -219,23 +219,41 @@ def send_signal():
 def health_check():
     """Health check endpoint for Railway"""
     print("Health check received")
-    return jsonify({"status": "Bot is running", "timestamp": time.time()}), 200
+    return jsonify({"status": "Bot is running", "timestamp": time.time(), "uptime": "active"}), 200
+
+# Add a special route for Railway to ping
+@app.route('/railway-health', methods=['GET'])
+def railway_health():
+    """Special health check for Railway"""
+    # This endpoint helps Railway determine the container is healthy
+    return jsonify({
+        "status": "healthy",
+        "service": "telegram-bot",
+        "timestamp": time.time(),
+        "version": "1.0"
+    }), 200
 
 # Improve keep-alive mechanism
 def keep_alive():
     """Periodically ping the app to keep it running"""
     while True:
         try:
-            time.sleep(60)  # Ping every minute
-            response = requests.get(f"{WEBHOOK_URL}")
+            # Shorter interval for more frequent pings
+            time.sleep(30)  # Ping every 30 seconds
+            
+            # Ping our own health endpoint
+            response = requests.get(f"{WEBHOOK_URL}/railway-health")
             print(f"Keep-alive ping sent. Status: {response.status_code}")
             
             # Also ping the Telegram API to keep the bot active
             bot_info = bot.get_me()
             print(f"Bot connection verified: @{bot_info.username}")
             
-            # Send a ping to Railway's ping service
-            requests.get("https://ping.railway.app")
+            # Send a message to ourselves to keep the connection active
+            if hasattr(bot, 'get_updates'):
+                bot.get_updates(offset=-1, limit=1, timeout=1)
+                print("Bot updates checked")
+                
         except Exception as e:
             print(f"Keep-alive error: {e}")
             # Try to reconnect if there's an error

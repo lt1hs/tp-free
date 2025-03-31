@@ -219,18 +219,11 @@ def send_signal():
 def health_check():
     """Health check endpoint for Railway"""
     print("Health check received")
-    return jsonify({"status": "Bot is running", "timestamp": time.time(), "uptime": "active"}), 200
-
-# Add a special route for Railway to ping
-@app.route('/railway-health', methods=['GET'])
-def railway_health():
-    """Special health check for Railway"""
-    # This endpoint helps Railway determine the container is healthy
     return jsonify({
-        "status": "healthy",
-        "service": "telegram-bot",
-        "timestamp": time.time(),
-        "version": "1.0"
+        "status": "Bot is running", 
+        "timestamp": time.time(), 
+        "uptime": "active",
+        "service_name": "telegram-trading-bot"
     }), 200
 
 # Improve keep-alive mechanism
@@ -238,32 +231,30 @@ def keep_alive():
     """Periodically ping the app to keep it running"""
     while True:
         try:
-            # Shorter interval for more frequent pings
-            time.sleep(30)  # Ping every 30 seconds
+            # Sleep first to allow the server to fully start
+            time.sleep(10)
+            print("Keep-alive thread running...")
             
-            # Ping our own health endpoint (use root endpoint instead of railway-health)
-            response = requests.get(f"{WEBHOOK_URL}")
-            print(f"Keep-alive ping sent. Status: {response.status_code}")
+            # Ping our own health endpoint
+            try:
+                response = requests.get(f"{WEBHOOK_URL}")
+                print(f"Keep-alive ping sent. Status: {response.status_code}")
+            except Exception as ping_error:
+                print(f"Error pinging health endpoint: {ping_error}")
             
-            # Also ping the Telegram API to keep the bot active
-            bot_info = bot.get_me()
-            print(f"Bot connection verified: @{bot_info.username}")
-            
-            # Don't use get_updates when webhook is active
-            # if hasattr(bot, 'get_updates'):
-            #     bot.get_updates(offset=-1, limit=1, timeout=1)
-            #     print("Bot updates checked")
+            # Verify bot connection
+            try:
+                bot_info = bot.get_me()
+                print(f"Bot connection verified: @{bot_info.username}")
+            except Exception as bot_error:
+                print(f"Error verifying bot connection: {bot_error}")
+                
+            # Sleep for the remainder of the interval
+            time.sleep(50)  # Total 60 seconds interval
                 
         except Exception as e:
             print(f"Keep-alive error: {e}")
-            # Try to reconnect if there's an error
-            try:
-                bot.remove_webhook()
-                time.sleep(1)
-                bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
-                print("Webhook reset after error")
-            except Exception as webhook_error:
-                print(f"Failed to reset webhook: {webhook_error}")
+            time.sleep(60)  # Wait a minute before trying again
 
 # Start Flask
 if __name__ == "__main__":
@@ -272,10 +263,10 @@ if __name__ == "__main__":
     print(f"Using port: {port}")
     
     # Start keep-alive thread
-    keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
+    keep_alive_thread = threading.Thread(target=keep_alive, daemon=False)  # Changed to non-daemon
     keep_alive_thread.start()
     
     try:
-        app.run(host="0.0.0.0", port=port)
+        app.run(host="0.0.0.0", port=port, threaded=True)
     except Exception as e:
         print(f"Error starting Flask server: {e}")

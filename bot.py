@@ -159,8 +159,28 @@ def confirm_send_signal(message, user_data, signal):
         bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
 
 # Remove any existing webhook before setting a new one
-bot.remove_webhook()
-bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+# Add delay and retry logic for webhook setup
+def setup_webhook():
+    try:
+        print("Setting up webhook...")
+        time.sleep(5)  # Wait 5 seconds before setting up webhook
+        bot.remove_webhook()
+        time.sleep(2)  # Wait 2 seconds after removing webhook
+        bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+        print("Webhook setup successful")
+    except telebot.apihelper.ApiTelegramException as e:
+        if "Too Many Requests" in str(e):
+            retry_after = int(str(e).split("retry after ")[1].split()[0])
+            print(f"Rate limited by Telegram. Waiting {retry_after} seconds...")
+            time.sleep(retry_after + 1)
+            setup_webhook()  # Retry after waiting
+        else:
+            print(f"Telegram API error: {e}")
+    except Exception as e:
+        print(f"Error setting up webhook: {e}")
+
+# Call the setup function instead of directly setting webhook
+setup_webhook()
 
 @app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():

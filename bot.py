@@ -39,3 +39,15 @@ def send_signal():
 # Start the Flask app
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000)
+
+    TOKEN = os.getenv("BOT_TOKEN")
+CHANNEL_ID = os.getenv("CHANNEL_ID")
+
+print("BOT_TOKEN:", TOKEN)  # Debugging line
+print("CHANNEL_ID:", CHANNEL_ID)  # Debugging line
+
+if not TOKEN:
+    raise ValueError("BOT_TOKEN is missing. Please check your environment variables.")
+
+import telebot
+bot = telebot.TeleBot(TOKEN)

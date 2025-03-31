@@ -5,7 +5,7 @@ from flask import Flask, request, jsonify
 # Load Environment Variables
 TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
-WEBHOOK_URL = os.getenv("WEBHOOK_URL")  # Use Railway-provided domain
+WEBHOOK_URL = "https://tp-bot-free.railway.app"  # Corrected Railway URL
 
 # Debugging: Check if environment variables are set
 if not TOKEN:

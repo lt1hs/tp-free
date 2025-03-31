@@ -53,9 +53,9 @@ def run_flask():
 
 # Function to Keep Bot Alive
 def run_bot():
-    bot.infinity_polling()
+    bot.infinity_polling()  # Keeps bot running
 
 # Run Flask and Bot in Parallel
 if __name__ == "__main__":
-    threading.Thread(target=run_flask).start()
-    run_bot()
+    threading.Thread(target=run_flask).start()  # Start Flask server
+    run_bot()  # Start the Telegram bot

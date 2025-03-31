@@ -1,6 +1,6 @@
 import telebot
 import os
-from flask import Flask, request
+from flask import Flask, request, jsonify
 
 # Load Environment Variables
 TOKEN = os.getenv("BOT_TOKEN")
@@ -23,13 +23,21 @@ print("WEBHOOK_URL:", WEBHOOK_URL)
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
 
-# Set Webhook
-@app.route('/' + TOKEN, methods=['POST'])
+# Remove any existing webhook before setting a new one
+bot.remove_webhook()
+bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+
+@app.route(f'/{TOKEN}', methods=['POST'])
 def webhook():
     """Receive Telegram updates via webhook"""
-    update = request.get_json()
-    bot.process_new_updates([telebot.types.Update.de_json(update)])
-    return "OK", 200
+    try:
+        update = request.get_json()
+        if update:
+            bot.process_new_updates([telebot.types.Update.de_json(update)])
+        return jsonify({"status": "success"}), 200
+    except Exception as e:
+        print(f"Error in webhook: {e}")
+        return jsonify({"status": "error", "message": str(e)}), 500
 
 # Signal Formatting Function
 def format_signal(asset, direction, entry, target, stop_loss, timeframe):
@@ -46,21 +54,32 @@ def format_signal(asset, direction, entry, target, stop_loss, timeframe):
 @app.route('/send_signal', methods=['POST'])
 def send_signal():
     """Send trading signal to Telegram"""
-    data = request.json
-    signal = format_signal(
-        data["asset"],
-        data["direction"],
-        data["entry"],
-        data["target"],
-        data["stop_loss"],
-        data["timeframe"]
-    )
-    bot.send_message(CHANNEL_ID, signal)
-    return "Signal sent!", 200
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Invalid JSON data"}), 400
+
+        required_fields = ["asset", "direction", "entry", "target", "stop_loss", "timeframe"]
+        for field in required_fields:
+            if field not in data:
+                return jsonify({"error": f"Missing field: {field}"}), 400
+
+        signal = format_signal(
+            data["asset"],
+            data["direction"],
+            data["entry"],
+            data["target"],
+            data["stop_loss"],
+            data["timeframe"]
+        )
+
+        bot.send_message(CHANNEL_ID, signal)
+        return jsonify({"message": "Signal sent successfully!"}), 200
+    except Exception as e:
+        print(f"Error sending signal: {e}")
+        return jsonify({"error": str(e)}), 500
 
 # Start Flask
 if __name__ == "__main__":
-    # Remove previous webhook before setting a new one
-    bot.remove_webhook()
-    bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")  # Set webhook
+    print("Starting Flask server...")
     app.run(host="0.0.0.0", port=5000)

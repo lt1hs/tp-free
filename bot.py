@@ -4,6 +4,7 @@ import threading
 import time
 import requests
 from flask import Flask, request, jsonify
+from flask_cors import CORS  # Import CORS
 
 # Load Environment Variables
 TOKEN = os.getenv("BOT_TOKEN")
@@ -29,6 +30,120 @@ print("WEBHOOK_URL:", WEBHOOK_URL)
 # Initialize Bot and Flask
 bot = telebot.TeleBot(TOKEN)
 app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes
+
+# Command handler for /start
+@bot.message_handler(commands=['start'])
+def handle_start(message):
+    bot.reply_to(message, "Welcome to Trading Signal Bot! Use /sendsignal to send a new trading signal.")
+
+# Command handler for /sendsignal
+@bot.message_handler(commands=['sendsignal'])
+def handle_send_signal_command(message):
+    msg = bot.reply_to(message, """
+Please send your signal data in the following format:
+
+Asset: BTC/USDT
+Direction: BUY
+Entry: 42000
+Target: 45000
+Stop Loss: 40000
+Timeframe: 4h
+""")
+    bot.register_next_step_handler(msg, process_asset_step)
+
+# Signal creation steps
+def process_asset_step(message):
+    try:
+        chat_id = message.chat.id
+        asset = message.text
+        user_data = {"asset": asset}
+        msg = bot.reply_to(message, f"Asset: {asset}\nNow enter the direction (BUY/SELL):")
+        bot.register_next_step_handler(msg, process_direction_step, user_data)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def process_direction_step(message, user_data):
+    try:
+        chat_id = message.chat.id
+        direction = message.text
+        if direction.upper() not in ["BUY", "SELL"]:
+            msg = bot.reply_to(message, "Please enter either BUY or SELL:")
+            bot.register_next_step_handler(msg, process_direction_step, user_data)
+            return
+        
+        user_data["direction"] = direction.upper()
+        msg = bot.reply_to(message, f"Direction: {direction.upper()}\nNow enter the entry price:")
+        bot.register_next_step_handler(msg, process_entry_step, user_data)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def process_entry_step(message, user_data):
+    try:
+        chat_id = message.chat.id
+        entry = message.text
+        user_data["entry"] = entry
+        msg = bot.reply_to(message, f"Entry: {entry}\nNow enter the target price:")
+        bot.register_next_step_handler(msg, process_target_step, user_data)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def process_target_step(message, user_data):
+    try:
+        chat_id = message.chat.id
+        target = message.text
+        user_data["target"] = target
+        msg = bot.reply_to(message, f"Target: {target}\nNow enter the stop loss:")
+        bot.register_next_step_handler(msg, process_stoploss_step, user_data)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def process_stoploss_step(message, user_data):
+    try:
+        chat_id = message.chat.id
+        stop_loss = message.text
+        user_data["stop_loss"] = stop_loss
+        msg = bot.reply_to(message, f"Stop Loss: {stop_loss}\nNow enter the timeframe (e.g., 4h, 1d):")
+        bot.register_next_step_handler(msg, process_timeframe_step, user_data)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def process_timeframe_step(message, user_data):
+    try:
+        chat_id = message.chat.id
+        timeframe = message.text
+        user_data["timeframe"] = timeframe
+        
+        # Format and send the signal
+        signal = format_signal(
+            user_data["asset"],
+            user_data["direction"],
+            user_data["entry"],
+            user_data["target"],
+            user_data["stop_loss"],
+            user_data["timeframe"]
+        )
+        
+        # Preview the signal
+        bot.send_message(chat_id, "Signal Preview:\n" + signal)
+        msg = bot.reply_to(message, "Do you want to send this signal? (yes/no)")
+        bot.register_next_step_handler(msg, confirm_send_signal, user_data, signal)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def confirm_send_signal(message, user_data, signal):
+    try:
+        chat_id = message.chat.id
+        answer = message.text.lower()
+        
+        if answer == "yes" or answer == "y":
+            # Send to the channel
+            bot.send_message(CHANNEL_ID, signal)
+            bot.send_message(chat_id, "✅ Signal has been sent to the channel!")
+        else:
+            bot.send_message(chat_id, "❌ Signal sending cancelled.")
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
 
 # Remove any existing webhook before setting a new one
 bot.remove_webhook()
@@ -117,10 +232,3 @@ if __name__ == "__main__":
         app.run(host="0.0.0.0", port=port)
     except Exception as e:
         print(f"Error starting Flask server: {e}")
-
-# Add this import at the top
-from flask_cors import CORS
-
-# After creating the Flask app, add:
-app = Flask(__name__)
-CORS(app)  # Enable CORS for all routes

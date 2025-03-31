@@ -344,25 +344,28 @@ if __name__ == "__main__":
     print(f"Using port: {port}")
     
     # Start keep-alive thread
-    keep_alive_thread = threading.Thread(target=keep_alive, daemon=False)  # Changed to non-daemon
+    keep_alive_thread = threading.Thread(target=keep_alive, daemon=False)
     keep_alive_thread.start()
     
-    # Try to use polling as a fallback if webhook isn't working
-    try:
-        # Start a separate thread for polling
-        def polling_thread():
-            try:
-                print("Starting polling as fallback...")
-                bot.polling(none_stop=True, interval=0, timeout=20)
-            except Exception as e:
-                print(f"Polling error: {e}")
+    # Use either webhook or polling, not both
+    USE_WEBHOOK = True  # Set to False to use polling instead
+    
+    if USE_WEBHOOK:
+        # Setup webhook
+        setup_webhook()
         
-        # Start polling in a separate thread
-        polling = threading.Thread(target=polling_thread)
-        polling.daemon = True
-        polling.start()
-        
-        # Start Flask server
-        app.run(host="0.0.0.0", port=port, threaded=True)
-    except Exception as e:
-        print(f"Error starting Flask server: {e}")
+        # Start Flask server for webhook
+        try:
+            app.run(host="0.0.0.0", port=port, threaded=True)
+        except Exception as e:
+            print(f"Error starting Flask server: {e}")
+    else:
+        # Use polling instead of webhook
+        try:
+            print("Using polling mode instead of webhook")
+            bot.remove_webhook()  # Make sure webhook is removed
+            time.sleep(1)
+            print("Starting polling...")
+            bot.polling(none_stop=True, interval=0, timeout=20)
+        except Exception as e:
+            print(f"Polling error: {e}")

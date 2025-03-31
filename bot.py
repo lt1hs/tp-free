@@ -35,11 +35,24 @@ CORS(app)  # Enable CORS for all routes
 # Command handler for /start
 @bot.message_handler(commands=['start'])
 def handle_start(message):
+    user_id = message.from_user.id
+    username = message.from_user.username
+    print(f"User {username} (ID: {user_id}) started the bot")
     bot.reply_to(message, "Welcome to Trading Signal Bot! Use /sendsignal to send a new trading signal.")
 
-# Command handler for /sendsignal
+# Add authorized users (you can modify this list)
+AUTHORIZED_USERS = []  # Add user IDs here, e.g. [123456789, 987654321]
+
+# Command handler for /sendsignal with authorization check
 @bot.message_handler(commands=['sendsignal'])
 def handle_send_signal_command(message):
+    user_id = message.from_user.id
+    
+    # Check if user is authorized (skip check if AUTHORIZED_USERS is empty)
+    if AUTHORIZED_USERS and user_id not in AUTHORIZED_USERS:
+        bot.reply_to(message, "You are not authorized to send signals.")
+        return
+        
     msg = bot.reply_to(message, """
 Please send your signal data in the following format:
 
@@ -207,16 +220,28 @@ def health_check():
     """Health check endpoint for Railway"""
     return jsonify({"status": "Bot is running"}), 200
 
-# Keep-alive mechanism
+# Improve keep-alive mechanism
 def keep_alive():
     """Periodically ping the app to keep it running"""
     while True:
         try:
-            time.sleep(300)  # Ping every 5 minutes
-            requests.get(f"{WEBHOOK_URL}")
-            print("Keep-alive ping sent")
+            time.sleep(180)  # Ping every 3 minutes
+            response = requests.get(f"{WEBHOOK_URL}")
+            print(f"Keep-alive ping sent. Status: {response.status_code}")
+            
+            # Also ping the Telegram API to keep the bot active
+            bot.get_me()
+            print("Bot connection verified")
         except Exception as e:
             print(f"Keep-alive error: {e}")
+            # Try to reconnect if there's an error
+            try:
+                bot.remove_webhook()
+                time.sleep(1)
+                bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
+                print("Webhook reset after error")
+            except Exception as webhook_error:
+                print(f"Failed to reset webhook: {webhook_error}")
 
 # Start Flask
 if __name__ == "__main__":

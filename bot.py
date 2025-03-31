@@ -241,18 +241,18 @@ def keep_alive():
             # Shorter interval for more frequent pings
             time.sleep(30)  # Ping every 30 seconds
             
-            # Ping our own health endpoint
-            response = requests.get(f"{WEBHOOK_URL}/railway-health")
+            # Ping our own health endpoint (use root endpoint instead of railway-health)
+            response = requests.get(f"{WEBHOOK_URL}")
             print(f"Keep-alive ping sent. Status: {response.status_code}")
             
             # Also ping the Telegram API to keep the bot active
             bot_info = bot.get_me()
             print(f"Bot connection verified: @{bot_info.username}")
             
-            # Send a message to ourselves to keep the connection active
-            if hasattr(bot, 'get_updates'):
-                bot.get_updates(offset=-1, limit=1, timeout=1)
-                print("Bot updates checked")
+            # Don't use get_updates when webhook is active
+            # if hasattr(bot, 'get_updates'):
+            #     bot.get_updates(offset=-1, limit=1, timeout=1)
+            #     print("Bot updates checked")
                 
         except Exception as e:
             print(f"Keep-alive error: {e}")

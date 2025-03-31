@@ -90,6 +90,9 @@ Entry: 42000
 Target: 45000
 Stop Loss: 40000
 Timeframe: 4h
+Category: Spot
+Leverage: 1x
+Expiry: 24h
 """)
     bot.register_next_step_handler(msg, process_asset_step)
 
@@ -155,14 +158,80 @@ def process_timeframe_step(message, user_data):
         timeframe = message.text
         user_data["timeframe"] = timeframe
         
+        # Add category step
+        msg = bot.reply_to(message, f"Timeframe: {timeframe}\nNow enter the category (Spot/Futures/Options):")
+        bot.register_next_step_handler(msg, process_category_step, user_data)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def process_category_step(message, user_data):
+    try:
+        chat_id = message.chat.id
+        category = message.text
+        if category.lower() not in ["spot", "futures", "options"]:
+            msg = bot.reply_to(message, "Please enter either Spot, Futures, or Options:")
+            bot.register_next_step_handler(msg, process_category_step, user_data)
+            return
+        
+        user_data["category"] = category.capitalize()
+        
+        # Add leverage step
+        msg = bot.reply_to(message, f"Category: {category.capitalize()}\nNow enter the recommended leverage (e.g., 1x, 5x, 10x):")
+        bot.register_next_step_handler(msg, process_leverage_step, user_data)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def process_leverage_step(message, user_data):
+    try:
+        chat_id = message.chat.id
+        leverage = message.text
+        user_data["leverage"] = leverage
+        
+        # Add expiry step
+        msg = bot.reply_to(message, f"Leverage: {leverage}\nNow enter the signal expiry time (e.g., 24h, 48h, 7d):")
+        bot.register_next_step_handler(msg, process_expiry_step, user_data)
+    except Exception as e:
+        bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+def process_expiry_step(message, user_data):
+    try:
+        chat_id = message.chat.id
+        expiry = message.text
+        user_data["expiry"] = expiry
+        
+        # Calculate risk/reward ratio
+        try:
+            entry = float(user_data["entry"])
+            target = float(user_data["target"])
+            stop_loss = float(user_data["stop_loss"])
+            
+            if user_data["direction"] == "BUY":
+                reward = target - entry
+                risk = entry - stop_loss
+            else:  # SELL
+                reward = entry - target
+                risk = stop_loss - entry
+                
+            if risk > 0:
+                risk_reward = round(reward / risk, 2)
+                user_data["risk_reward"] = str(risk_reward)
+            else:
+                user_data["risk_reward"] = "N/A"
+        except:
+            user_data["risk_reward"] = "N/A"
+        
         # Format and send the signal
-        signal = format_signal(
+        signal = format_signal_enhanced(
             user_data["asset"],
             user_data["direction"],
             user_data["entry"],
             user_data["target"],
             user_data["stop_loss"],
-            user_data["timeframe"]
+            user_data["timeframe"],
+            user_data["category"],
+            user_data["leverage"],
+            user_data["expiry"],
+            user_data["risk_reward"]
         )
         
         # Preview the signal
@@ -171,6 +240,29 @@ def process_timeframe_step(message, user_data):
         bot.register_next_step_handler(msg, confirm_send_signal, user_data, signal)
     except Exception as e:
         bot.reply_to(message, f"Error: {str(e)}\nPlease try again with /sendsignal")
+
+# Enhanced signal formatting function
+def format_signal_enhanced(asset, direction, entry, target, stop_loss, timeframe, category, leverage, expiry, risk_reward):
+    return f"""
+🚀 **{asset} Signal**
+📈 Direction: {direction}
+🎯 Entry: {entry}
+🎯 Target: {target}
+🛑 Stop Loss: {stop_loss}
+⏳ Timeframe: {timeframe}
+📊 Category: {category}
+⚖️ Leverage: {leverage}
+⌛ Expires in: {expiry}
+📉 Risk/Reward: {risk_reward}
+"""
+
+# Update the existing format_signal function to call the enhanced version
+def format_signal(asset, direction, entry, target, stop_loss, timeframe):
+    # For backward compatibility with API calls
+    return format_signal_enhanced(
+        asset, direction, entry, target, stop_loss, timeframe, 
+        "Spot", "1x", "24h", "N/A"
+    )
 
 def confirm_send_signal(message, user_data, signal):
     try:
@@ -297,15 +389,28 @@ def send_signal():
 
 # Health check endpoint for Railway
 @app.route('/', methods=['GET'])
-def health_check():
-    """Health check endpoint for Railway"""
-    print("Health check received")
-    return jsonify({
-        "status": "Bot is running", 
-        "timestamp": time.time(), 
-        "uptime": "active",
-        "service_name": "telegram-trading-bot"
-    }), 200
+def handle_timeframes(message):
+    timeframes_text = """
+Available timeframes for your signals:
+
+Short-term:
+- 1m (1 minute)
+- 5m (5 minutes)
+- 15m (15 minutes)
+- 30m (30 minutes)
+- 1h (1 hour)
+- 2h (2 hours)
+- 4h (4 hours)
+
+Long-term:
+- 1d (1 day)
+- 3d (3 days)
+- 1w (1 week)
+- 1M (1 month)
+
+Use these abbreviations when creating signals.
+"""
+    bot.reply_to(message, timeframes_text)
 
 # Improve keep-alive mechanism
 def keep_alive():

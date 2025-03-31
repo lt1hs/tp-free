@@ -192,13 +192,24 @@ def setup_webhook():
     try:
         print("Setting up webhook...")
         time.sleep(5)  # Wait 5 seconds before setting up webhook
-        bot.remove_webhook()
+        
+        # First, get current webhook info
+        current_webhook = bot.get_webhook_info()
+        print(f"Current webhook URL: {current_webhook.url}")
+        
+        # Remove webhook if it exists
+        if current_webhook.url:
+            print("Removing existing webhook...")
+            bot.remove_webhook()
+            print("Existing webhook removed")
+        
         time.sleep(2)  # Wait 2 seconds after removing webhook
         
         webhook_url = f"{WEBHOOK_URL}/{TOKEN}"
         print(f"Setting webhook to: {webhook_url}")
         
-        result = bot.set_webhook(url=webhook_url)
+        # Set the webhook with max_connections parameter
+        result = bot.set_webhook(url=webhook_url, max_connections=5)
         if result:
             print("Webhook setup successful")
         else:
@@ -209,6 +220,9 @@ def setup_webhook():
         print(f"Webhook URL: {webhook_info.url}")
         print(f"Webhook has custom certificate: {webhook_info.has_custom_certificate}")
         print(f"Webhook pending updates: {webhook_info.pending_update_count}")
+        print(f"Webhook max connections: {webhook_info.max_connections}")
+        print(f"Webhook last error date: {webhook_info.last_error_date}")
+        print(f"Webhook last error message: {webhook_info.last_error_message}")
         
     except telebot.apihelper.ApiTelegramException as e:
         if "Too Many Requests" in str(e):
@@ -228,9 +242,14 @@ setup_webhook()
 def webhook():
     """Receive Telegram updates via webhook"""
     try:
+        print("Webhook endpoint called!")
         update = request.get_json()
+        print(f"Received update: {update}")
+        
         if update:
+            print("Processing update...")
             bot.process_new_updates([telebot.types.Update.de_json(update)])
+            print("Update processed")
         return jsonify({"status": "success"}), 200
     except Exception as e:
         print(f"Error in webhook: {e}")
@@ -328,7 +347,22 @@ if __name__ == "__main__":
     keep_alive_thread = threading.Thread(target=keep_alive, daemon=False)  # Changed to non-daemon
     keep_alive_thread.start()
     
+    # Try to use polling as a fallback if webhook isn't working
     try:
+        # Start a separate thread for polling
+        def polling_thread():
+            try:
+                print("Starting polling as fallback...")
+                bot.polling(none_stop=True, interval=0, timeout=20)
+            except Exception as e:
+                print(f"Polling error: {e}")
+        
+        # Start polling in a separate thread
+        polling = threading.Thread(target=polling_thread)
+        polling.daemon = True
+        polling.start()
+        
+        # Start Flask server
         app.run(host="0.0.0.0", port=port, threaded=True)
     except Exception as e:
         print(f"Error starting Flask server: {e}")

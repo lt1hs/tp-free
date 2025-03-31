@@ -366,7 +366,11 @@ if __name__ == "__main__":
             bot.remove_webhook()  # Make sure webhook is removed
             time.sleep(1)
             print("Starting polling...")
-            # Use a more robust polling configuration
-            bot.infinity_polling(timeout=10, long_polling_timeout=30)
+            
+            # Configure the bot to skip pending updates to avoid duplicate responses
+            bot.skip_pending = True
+            
+            # Use a more robust polling configuration with skip_pending=True
+            bot.infinity_polling(timeout=10, long_polling_timeout=30, skip_pending=True)
         except Exception as e:
             print(f"Polling error: {e}")

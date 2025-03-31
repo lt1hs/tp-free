@@ -38,7 +38,35 @@ def handle_start(message):
     user_id = message.from_user.id
     username = message.from_user.username
     print(f"User {username} (ID: {user_id}) started the bot")
-    bot.reply_to(message, "Welcome to Trading Signal Bot! Use /sendsignal to send a new trading signal.")
+    try:
+        bot.reply_to(message, "Welcome to Trading Signal Bot! Use /sendsignal to send a new trading signal or /test to test the bot.")
+        print(f"Start message sent to user {username}")
+    except Exception as e:
+        print(f"Error sending start message: {e}")
+
+# Add a test command to verify bot functionality
+@bot.message_handler(commands=['test'])
+def handle_test(message):
+    user_id = message.from_user.id
+    username = message.from_user.username
+    print(f"User {username} (ID: {user_id}) is testing the bot")
+    
+    try:
+        # Test reply to user
+        bot.reply_to(message, "✅ Bot is working! This is a test message.")
+        print(f"Test message sent to user {username}")
+        
+        # Test channel message
+        try:
+            test_message = f"🔄 Test message from @{username} (ID: {user_id})"
+            bot.send_message(CHANNEL_ID, test_message)
+            bot.reply_to(message, f"✅ Test message sent to channel {CHANNEL_ID}")
+            print(f"Test message sent to channel {CHANNEL_ID}")
+        except Exception as channel_error:
+            bot.reply_to(message, f"❌ Error sending to channel: {str(channel_error)}")
+            print(f"Error sending to channel: {channel_error}")
+    except Exception as e:
+        print(f"Error in test command: {e}")
 
 # Add authorized users (you can modify this list)
 AUTHORIZED_USERS = []  # Add user IDs here, e.g. [123456789, 987654321]
@@ -166,8 +194,22 @@ def setup_webhook():
         time.sleep(5)  # Wait 5 seconds before setting up webhook
         bot.remove_webhook()
         time.sleep(2)  # Wait 2 seconds after removing webhook
-        bot.set_webhook(url=f"{WEBHOOK_URL}/{TOKEN}")
-        print("Webhook setup successful")
+        
+        webhook_url = f"{WEBHOOK_URL}/{TOKEN}"
+        print(f"Setting webhook to: {webhook_url}")
+        
+        result = bot.set_webhook(url=webhook_url)
+        if result:
+            print("Webhook setup successful")
+        else:
+            print("Webhook setup failed")
+            
+        # Verify webhook info
+        webhook_info = bot.get_webhook_info()
+        print(f"Webhook URL: {webhook_info.url}")
+        print(f"Webhook has custom certificate: {webhook_info.has_custom_certificate}")
+        print(f"Webhook pending updates: {webhook_info.pending_update_count}")
+        
     except telebot.apihelper.ApiTelegramException as e:
         if "Too Many Requests" in str(e):
             retry_after = int(str(e).split("retry after ")[1].split()[0])

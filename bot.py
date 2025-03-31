@@ -7,6 +7,10 @@ TOKEN = os.getenv("BOT_TOKEN")
 CHANNEL_ID = os.getenv("CHANNEL_ID")
 WEBHOOK_URL = "https://tp-bot-free.railway.app"  # Corrected Railway URL
 
+# Make sure CHANNEL_ID is properly formatted
+if CHANNEL_ID and not CHANNEL_ID.startswith('@') and not CHANNEL_ID.startswith('-'):
+    CHANNEL_ID = '@' + CHANNEL_ID
+
 # Debugging: Check if environment variables are set
 if not TOKEN:
     raise ValueError("BOT_TOKEN is missing. Check your Railway environment variables.")
@@ -79,8 +83,18 @@ def send_signal():
         print(f"Error sending signal: {e}")
         return jsonify({"error": str(e)}), 500
 
+# Health check endpoint for Railway
+@app.route('/', methods=['GET'])
+def health_check():
+    """Health check endpoint for Railway"""
+    return jsonify({"status": "Bot is running"}), 200
+
 # Start Flask
 if __name__ == "__main__":
     print("Starting Flask server...")
     port = int(os.getenv("PORT", 5000))  # Use Railway's PORT env var or default to 5000
-    app.run(host="0.0.0.0", port=port)
+    print(f"Using port: {port}")
+    try:
+        app.run(host="0.0.0.0", port=port)
+    except Exception as e:
+        print(f"Error starting Flask server: {e}")

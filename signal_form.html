@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Send Trading Signal</title>
+    <style>
+        body { font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; }
+        .form-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; }
+        input, select { width: 100%; padding: 8px; box-sizing: border-box; }
+        button { padding: 10px 15px; background-color: #4CAF50; color: white; border: none; cursor: pointer; }
+        .result { margin-top: 20px; padding: 10px; border: 1px solid #ddd; }
+        .success { background-color: #dff0d8; color: #3c763d; }
+        .error { background-color: #f2dede; color: #a94442; }
+    </style>
+</head>
+<body>
+    <h1>Send Trading Signal</h1>
+    <div class="form-group">
+        <label for="asset">Asset:</label>
+        <input type="text" id="asset" placeholder="BTC/USDT">
+    </div>
+    <div class="form-group">
+        <label for="direction">Direction:</label>
+        <select id="direction">
+            <option value="BUY">BUY</option>
+            <option value="SELL">SELL</option>
+        </select>
+    </div>
+    <div class="form-group">
+        <label for="entry">Entry Price:</label>
+        <input type="text" id="entry" placeholder="42000">
+    </div>
+    <div class="form-group">
+        <label for="target">Target Price:</label>
+        <input type="text" id="target" placeholder="45000">
+    </div>
+    <div class="form-group">
+        <label for="stop_loss">Stop Loss:</label>
+        <input type="text" id="stop_loss" placeholder="40000">
+    </div>
+    <div class="form-group">
+        <label for="timeframe">Timeframe:</label>
+        <input type="text" id="timeframe" placeholder="4h">
+    </div>
+    <button onclick="sendSignal()">Send Signal</button>
+    <div id="result" class="result" style="display: none;"></div>
+
+    <script>
+        function sendSignal() {
+            const payload = {
+                asset: document.getElementById('asset').value,
+                direction: document.getElementById('direction').value,
+                entry: document.getElementById('entry').value,
+                target: document.getElementById('target').value,
+                stop_loss: document.getElementById('stop_loss').value,
+                timeframe: document.getElementById('timeframe').value
+            };
+
+            // Validate inputs
+            for (const key in payload) {
+                if (!payload[key]) {
+                    showResult(`Error: ${key} is required`, true);
+                    return;
+                }
+            }
+
+            // Show loading state
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = "Sending signal...";
+            resultDiv.className = "result";
+            resultDiv.style.display = 'block';
+
+            // Use XMLHttpRequest instead of fetch for better error handling
+            const xhr = new XMLHttpRequest();
+            xhr.open('POST', 'https://tp-bot-free.railway.app/send_signal', true);
+            xhr.setRequestHeader('Content-Type', 'application/json');
+            
+            xhr.onload = function() {
+                if (xhr.status >= 200 && xhr.status < 300) {
+                    try {
+                        const data = JSON.parse(xhr.responseText);
+                        showResult(`Success: ${data.message || "Signal sent successfully!"}`, false);
+                    } catch (e) {
+                        showResult(`Success but invalid response: ${xhr.responseText}`, false);
+                    }
+                } else {
+                    showResult(`Error: Server returned status ${xhr.status} - ${xhr.responseText}`, true);
+                }
+            };
+            
+            xhr.onerror = function() {
+                showResult("Error: Network error occurred. This could be due to CORS restrictions. Try using the Python script or curl command instead.", true);
+            };
+            
+            xhr.send(JSON.stringify(payload));
+        }
+
+        function showResult(message, isError) {
+            const resultDiv = document.getElementById('result');
+            resultDiv.textContent = message;
+            resultDiv.className = isError ? "result error" : "result success";
+            resultDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html>

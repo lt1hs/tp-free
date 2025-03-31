@@ -117,3 +117,10 @@ if __name__ == "__main__":
         app.run(host="0.0.0.0", port=port)
     except Exception as e:
         print(f"Error starting Flask server: {e}")
+
+# Add this import at the top
+from flask_cors import CORS
+
+# After creating the Flask app, add:
+app = Flask(__name__)
+CORS(app)  # Enable CORS for all routes

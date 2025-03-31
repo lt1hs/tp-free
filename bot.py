@@ -1,5 +1,8 @@
 import telebot
 import os
+import threading
+import time
+import requests
 from flask import Flask, request, jsonify
 
 # Load Environment Variables
@@ -89,11 +92,27 @@ def health_check():
     """Health check endpoint for Railway"""
     return jsonify({"status": "Bot is running"}), 200
 
+# Keep-alive mechanism
+def keep_alive():
+    """Periodically ping the app to keep it running"""
+    while True:
+        try:
+            time.sleep(300)  # Ping every 5 minutes
+            requests.get(f"{WEBHOOK_URL}")
+            print("Keep-alive ping sent")
+        except Exception as e:
+            print(f"Keep-alive error: {e}")
+
 # Start Flask
 if __name__ == "__main__":
     print("Starting Flask server...")
-    port = int(os.getenv("PORT", 5000))  # Use Railway's PORT env var or default to 5000
+    port = int(os.getenv("PORT", 8080))  # Use Railway's PORT env var or default to 8080
     print(f"Using port: {port}")
+    
+    # Start keep-alive thread
+    keep_alive_thread = threading.Thread(target=keep_alive, daemon=True)
+    keep_alive_thread.start()
+    
     try:
         app.run(host="0.0.0.0", port=port)
     except Exception as e:
